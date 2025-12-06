@@ -26,29 +26,44 @@ dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
 
 
 # =========================
-# 2. Download models from Dropbox
+# 2. Download latest artifacts from Dropbox by prefix
 # =========================
 os.makedirs("artifacts", exist_ok=True)
 
-ARTIFACTS = {
-    "Logistic Regression": "logreg_model.joblib",
-    "Random Forest": "rf_model.joblib",
-    "XGBoost": "xgb_model.joblib",
-    "Features": "feature_columns.joblib",
-    "Scaler": "scaler.joblib"
-}
+def download_latest(prefix: str, local_path: str):
+    # List all files in the target folder
+    result = dbx.files_list_folder(DROPBOX_FOLDER)
 
-def download_from_dropbox(local_path, dropbox_path):
-    if not os.path.exists(local_path):
-        md, res = dbx.files_download(dropbox_path)
-        with open(local_path, "wb") as f:
-            f.write(res.content)
+    # Keep only files whose name starts with the given prefix
+    candidates = [
+        entry for entry in result.entries
+        if isinstance(entry, dropbox.files.FileMetadata)
+        and entry.name.startswith(prefix)
+    ]
 
-for name, fname in ARTIFACTS.items():
-    download_from_dropbox(
-        f"artifacts/{fname}",
-        f"{DROPBOX_FOLDER}/{fname}"
-    )
+    if not candidates:
+        st.error(f"No file found in Dropbox with prefix: {prefix}")
+        st.stop()
+
+    # Pick latest by modification time
+    latest_file = sorted(
+        candidates,
+        key=lambda x: x.client_modified
+    )[-1]
+
+    md, res = dbx.files_download(latest_file.path_lower)
+    with open(local_path, "wb") as f:
+        f.write(res.content)
+
+    st.write(f"Loaded {prefix} from Dropbox file: {latest_file.name}")
+
+
+# Download all required artifacts
+download_latest("logreg_model",       "artifacts/logreg_model.joblib")
+download_latest("rf_model",           "artifacts/rf_model.joblib")
+download_latest("xgb_model",          "artifacts/xgb_model.joblib")
+download_latest("feature_columns",    "artifacts/feature_columns.joblib")
+download_latest("scaler",             "artifacts/scaler.joblib")
 
 
 # =========================
@@ -60,7 +75,6 @@ xgb_model    = joblib.load("artifacts/xgb_model.joblib")
 
 feature_columns = joblib.load("artifacts/feature_columns.joblib")
 scaler = joblib.load("artifacts/scaler.joblib")
-
 
 MODELS = {
     "Logistic Regression": logreg_model,
