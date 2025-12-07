@@ -167,17 +167,14 @@ This version is kept only for comparison.
 
 ## 8. Deployed Endpoint
 
-Endpoint URL:
-https://YOUR-RENDER-APP-NAME.onrender.com/
-
 UI:
-https://YOUR-RENDER-APP-NAME.onrender.com/
+https://rain-in-australia-app-fast-api.onrender.com/
 
 API Docs:
-https://YOUR-RENDER-APP-NAME.onrender.com/docs
+https://rain-in-australia-app-fast-api.onrender.com/docs
 
 Prediction Endpoint:
-POST https://YOUR-RENDER-APP-NAME.onrender.com/predict
+POST https://rain-in-australia-app-fast-api.onrender.com/predict
 
 ---
 
