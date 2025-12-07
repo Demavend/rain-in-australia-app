@@ -8,6 +8,7 @@ import streamlit as st
 import dropbox
 
 from dotenv import load_dotenv
+from dropbox.exceptions import AuthError
 from sklearn.exceptions import InconsistentVersionWarning
 
 
@@ -29,14 +30,28 @@ warnings.filterwarnings(
 # =========================
 load_dotenv()
 
-DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
+DROPBOX_APP_KEY = os.getenv("DROPBOX_APP_KEY")
+DROPBOX_APP_SECRET = os.getenv("DROPBOX_APP_SECRET")
+DROPBOX_REFRESH_TOKEN = os.getenv("DROPBOX_REFRESH_TOKEN")
 DROPBOX_FOLDER = os.getenv("DROPBOX_FOLDER", "/weather-ml-upload")
 
-if DROPBOX_ACCESS_TOKEN is None:
-    st.error("Dropbox token not found in environment variables")
+if not all([DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN]):
+    st.error(
+        "Dropbox credentials not found in environment variables. "
+        "Expected DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN."
+    )
     st.stop()
 
-dbx = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+try:
+    dbx = dropbox.Dropbox(
+        oauth2_access_token=None,
+        oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
+        app_key=DROPBOX_APP_KEY,
+        app_secret=DROPBOX_APP_SECRET,
+    )
+except AuthError as e:
+    st.error(f"Failed to initialize Dropbox client: {e}")
+    st.stop()
 
 
 # =========================
@@ -49,7 +64,12 @@ def download_latest(prefix: str, local_path: str) -> None:
     """Download latest file from Dropbox folder whose name starts with given prefix."""
     print(f"[INFO] Looking for latest file with prefix: {prefix}")
 
-    result = dbx.files_list_folder(DROPBOX_FOLDER)
+    try:
+        result = dbx.files_list_folder(DROPBOX_FOLDER)
+    except AuthError as e:
+        # If something goes wrong with auth, show it in UI
+        st.error(f"Dropbox auth error while listing folder: {e}")
+        st.stop()
 
     candidates = [
         entry
@@ -68,7 +88,12 @@ def download_latest(prefix: str, local_path: str) -> None:
 
     print(f"[INFO] Downloading: {latest_file.name}")
 
-    md, res = dbx.files_download(latest_file.path_lower)
+    try:
+        md, res = dbx.files_download(latest_file.path_lower)
+    except AuthError as e:
+        st.error(f"Dropbox auth error while downloading {latest_file.name}: {e}")
+        st.stop()
+
     with open(local_path, "wb") as f:
         f.write(res.content)
 
@@ -130,7 +155,6 @@ model_name = st.segmented_control(
 )
 
 st.subheader("Weather data for today")
-
 
 Location = st.selectbox(
     "City (Location):",
